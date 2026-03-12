@@ -398,9 +398,13 @@ async function handleShotSplitStream(
       try {
         const parsedShots = JSON.parse(extractJSON(text)) as Array<{
           sequence: number;
-          prompt: string;
+          sceneDescription: string;
+          startFrame: string;
+          endFrame: string;
+          motionScript: string;
           duration: number;
           dialogues: Array<{ character: string; text: string }>;
+          cameraDirection?: string;
         }>;
 
         for (const shot of parsedShots) {
@@ -409,7 +413,11 @@ async function handleShotSplitStream(
             id: shotId,
             projectId,
             sequence: shot.sequence,
-            prompt: shot.prompt,
+            prompt: shot.sceneDescription,
+            startFrameDesc: shot.startFrame,
+            endFrameDesc: shot.endFrame,
+            motionScript: shot.motionScript,
+            cameraDirection: shot.cameraDirection || "static",
             duration: shot.duration,
           });
 
@@ -471,11 +479,7 @@ async function handleBatchFrameGenerate(
     .where(eq(characters.projectId, projectId));
 
   const characterDescriptions = projectCharacters
-    .map((c) => {
-      let desc = `${c.name}: ${c.description}`;
-      if (c.referenceImage) desc += ` [ref: ${c.referenceImage}]`;
-      return desc;
-    })
+    .map((c) => `${c.name}: ${c.description}`)
     .join("\n");
 
   const ai = resolveImageProvider(modelConfig);
@@ -494,6 +498,8 @@ async function handleBatchFrameGenerate(
 
       let firstFramePath: string;
 
+      const charRefImages = projectCharacters.map((c) => c.referenceImage).filter(Boolean) as string[];
+
       if (i === 0) {
         // First shot: generate first frame
         const firstPrompt = buildFirstFramePrompt({
@@ -503,6 +509,7 @@ async function handleBatchFrameGenerate(
         firstFramePath = await ai.generateImage(firstPrompt, {
           size: "1792x1024",
           quality: "hd",
+          referenceImages: charRefImages,
         });
       } else {
         // Continuity chain: reuse previous shot's last frame
@@ -518,6 +525,7 @@ async function handleBatchFrameGenerate(
       const lastFramePath = await ai.generateImage(lastPrompt, {
         size: "1792x1024",
         quality: "hd",
+        referenceImages: [firstFramePath, ...charRefImages],
       });
 
       await db
@@ -584,12 +592,12 @@ async function handleSingleFrameGenerate(
     .where(eq(characters.projectId, projectId));
 
   const characterDescriptions = projectCharacters
-    .map((c) => {
-      let d = `${c.name}: ${c.description}`;
-      if (c.referenceImage) d += ` [ref: ${c.referenceImage}]`;
-      return d;
-    })
+    .map((c) => `${c.name}: ${c.description}`)
     .join("\n");
+
+  const charRefImages = projectCharacters
+    .map((c) => c.referenceImage)
+    .filter(Boolean) as string[];
 
   // Find previous shot's last frame for continuity
   const [previousShot] = await db
@@ -611,7 +619,7 @@ async function handleSingleFrameGenerate(
     });
     const firstFramePath = await ai.generateImage(firstPrompt, {
       quality: "hd",
-      referenceImages: projectCharacters.map((c) => c.referenceImage).filter(Boolean) as string[],
+      referenceImages: charRefImages,
     });
 
     const lastPrompt = buildLastFramePrompt({
@@ -621,7 +629,7 @@ async function handleSingleFrameGenerate(
     });
     const lastFramePath = await ai.generateImage(lastPrompt, {
       quality: "hd",
-      referenceImages: projectCharacters.map((c) => c.referenceImage).filter(Boolean) as string[],
+      referenceImages: [firstFramePath, ...charRefImages],
     });
 
     await db
