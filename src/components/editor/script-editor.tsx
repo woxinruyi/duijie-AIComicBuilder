@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useProjectStore } from "@/stores/project-store";
@@ -16,6 +16,14 @@ export function ScriptEditor() {
   const getModelConfig = useModelStore((s) => s.getModelConfig);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const scriptTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (generating && scriptTextareaRef.current) {
+      const el = scriptTextareaRef.current;
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [project?.script, generating]);
 
   if (!project) return null;
 
@@ -141,6 +149,7 @@ export function ScriptEditor() {
             </span>
           </div>
           <Textarea
+            ref={scriptTextareaRef}
             value={project.script}
             onChange={(e) => updateScript(e.target.value)}
             rows={16}

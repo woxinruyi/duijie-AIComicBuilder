@@ -36,11 +36,15 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async generateImage(prompt: string, options?: ImageOptions): Promise<string> {
+    const model = options?.model || this.defaultModel;
+    const isDallE = model.startsWith("dall-e");
     const response = await this.client.images.generate({
-      model: options?.model || "dall-e-3",
+      model,
       prompt,
-      size: (options?.size as "1024x1024" | "1792x1024" | "1024x1792") || "1024x1024",
-      quality: (options?.quality as "standard" | "hd") || "standard",
+      ...(isDallE && {
+        size: (options?.size as "1024x1024" | "1792x1024" | "1024x1792") || "1024x1024",
+        quality: (options?.quality as "standard" | "hd") || "standard",
+      }),
       n: 1,
     });
 

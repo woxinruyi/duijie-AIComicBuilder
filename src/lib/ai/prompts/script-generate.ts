@@ -47,15 +47,23 @@ Screenwriting principles:
 
 Do NOT output JSON. Do NOT use markdown code fences. Output plain screenplay text only.`;
 
+function detectLanguage(text: string): string {
+  if (/[\u4e00-\u9fff]/.test(text)) return "Chinese (中文)";
+  if (/[\u3040-\u309f\u30a0-\u30ff]/.test(text)) return "Japanese (日本語)";
+  if (/[\uac00-\ud7af]/.test(text)) return "Korean (한국어)";
+  return "English";
+}
+
 export function buildScriptGeneratePrompt(idea: string): string {
+  const lang = detectLanguage(idea);
   return `Write a complete, production-ready short-form screenplay based on this creative concept:
 
 "${idea}"
 
+OUTPUT LANGUAGE: ${lang}. You MUST write EVERY word of your output in ${lang}, including all section headers, character descriptions, stage directions, and dialogue. Do NOT use English if the language is not English.
+
 You MUST include all three sections in order: VISUAL STYLE → CHARACTERS → SCENES.
 - If the user specifies an art style (e.g., "真人", "动漫", "realistic", "anime"), use that as the visual style. If not specified, infer the most fitting style from the concept.
 - The CHARACTERS section must have detailed visual descriptions for every character — this is critical because downstream AI image generators will rely on these descriptions to produce consistent character images.
-- Each scene description should be vivid enough for an AI image generator to produce a frame directly.
-
-IMPORTANT: Your output language MUST match the language of the creative concept above. If it is written in Chinese, write the entire screenplay in Chinese. If in Japanese, write in Japanese. And so on.`;
+- Each scene description should be vivid enough for an AI image generator to produce a frame directly.`;
 }
