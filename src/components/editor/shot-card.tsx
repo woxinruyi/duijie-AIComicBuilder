@@ -72,6 +72,10 @@ export function ShotCard({
   const t = useTranslations();
   const getModelConfig = useModelStore((s) => s.getModelConfig);
   const [editPrompt, setEditPrompt] = useState(prompt);
+  const [editStartFrame, setEditStartFrame] = useState(startFrameDesc ?? "");
+  const [editEndFrame, setEditEndFrame] = useState(endFrameDesc ?? "");
+  const [editMotionScript, setEditMotionScript] = useState(motionScript ?? "");
+  const [editCameraDirection, setEditCameraDirection] = useState(cameraDirection ?? "static");
   const [editDuration, setEditDuration] = useState(duration);
   const [generatingFrames, setGeneratingFrames] = useState(false);
   const [generatingVideo, setGeneratingVideo] = useState(false);
@@ -80,21 +84,17 @@ export function ShotCard({
   const [videoRatio, setVideoRatio] = useState("16:9");
   const variant = statusVariant[status] || "outline";
 
-  async function handleSave() {
+  async function patchShot(fields: Record<string, unknown>) {
     await apiFetch(`/api/projects/${projectId}/shots/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: editPrompt }),
+      body: JSON.stringify(fields),
     });
   }
 
   async function handleDurationChange(d: number) {
     setEditDuration(d);
-    await apiFetch(`/api/projects/${projectId}/shots/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ duration: d }),
-    });
+    await patchShot({ duration: d });
   }
 
   async function handleGenerateFrames() {
@@ -279,7 +279,7 @@ export function ShotCard({
       {/* Expanded detail */}
       {expanded && (
         <div className="space-y-4 border-t border-[--border-subtle] p-4">
-          {/* Scene Description (editable) */}
+          {/* Scene Description */}
           <div>
             <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[--text-muted]">
               {t("shot.sceneDescription")}
@@ -287,48 +287,70 @@ export function ShotCard({
             <Textarea
               value={editPrompt}
               onChange={(e) => setEditPrompt(e.target.value)}
-              onBlur={handleSave}
+              onBlur={() => patchShot({ prompt: editPrompt })}
               rows={2}
               placeholder={t("shot.prompt")}
             />
           </div>
 
           {/* Start Frame Description */}
-          {startFrameDesc && (
-            <div className="rounded-xl bg-blue-50/50 p-3">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-blue-600">
-                {t("shot.startFrame")}
-              </p>
-              <p className="text-sm leading-relaxed text-[--text-secondary]">{startFrameDesc}</p>
-            </div>
-          )}
+          <div className="rounded-xl bg-blue-50/50 p-3">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-blue-600">
+              {t("shot.startFrame")}
+            </p>
+            <Textarea
+              value={editStartFrame}
+              onChange={(e) => setEditStartFrame(e.target.value)}
+              onBlur={() => patchShot({ startFrameDesc: editStartFrame })}
+              rows={2}
+              className="border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
+              placeholder="Start frame description..."
+            />
+          </div>
 
           {/* End Frame Description */}
-          {endFrameDesc && (
-            <div className="rounded-xl bg-amber-50/50 p-3">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-600">
-                {t("shot.endFrame")}
-              </p>
-              <p className="text-sm leading-relaxed text-[--text-secondary]">{endFrameDesc}</p>
-            </div>
-          )}
+          <div className="rounded-xl bg-amber-50/50 p-3">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-600">
+              {t("shot.endFrame")}
+            </p>
+            <Textarea
+              value={editEndFrame}
+              onChange={(e) => setEditEndFrame(e.target.value)}
+              onBlur={() => patchShot({ endFrameDesc: editEndFrame })}
+              rows={2}
+              className="border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
+              placeholder="End frame description..."
+            />
+          </div>
 
           {/* Motion Script */}
-          {motionScript && (
-            <div className="rounded-xl bg-emerald-50/50 p-3">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-emerald-600">
-                {t("shot.motionScript")}
-              </p>
-              <p className="text-sm leading-relaxed text-[--text-secondary]">{motionScript}</p>
-            </div>
-          )}
+          <div className="rounded-xl bg-emerald-50/50 p-3">
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-emerald-600">
+              {t("shot.motionScript")}
+            </p>
+            <Textarea
+              value={editMotionScript}
+              onChange={(e) => setEditMotionScript(e.target.value)}
+              onBlur={() => patchShot({ motionScript: editMotionScript })}
+              rows={2}
+              className="border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
+              placeholder="Motion script..."
+            />
+          </div>
 
           {/* Camera Direction */}
-          {cameraDirection && cameraDirection !== "static" && (
-            <Badge variant="outline" className="text-xs">
-              {cameraDirection}
-            </Badge>
-          )}
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[--text-muted]">
+              {t("shot.cameraDirection") || "Camera Direction"}
+            </p>
+            <input
+              value={editCameraDirection}
+              onChange={(e) => setEditCameraDirection(e.target.value)}
+              onBlur={() => patchShot({ cameraDirection: editCameraDirection })}
+              className="w-full rounded-xl border border-[--border-subtle] bg-white px-3.5 py-2 text-sm text-[--text-primary] outline-none focus:border-primary/50"
+              placeholder="static / pan-left / zoom-in ..."
+            />
+          </div>
 
           {dialogues.length > 0 && (
             <div className="space-y-2 rounded-xl bg-[--surface] p-4">

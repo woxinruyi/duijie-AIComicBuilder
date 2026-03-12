@@ -690,6 +690,14 @@ async function handleSingleVideoGenerate(
     return NextResponse.json({ error: "Shot frames not generated yet" }, { status: 400 });
   }
 
+  const shotCharacters = await db
+    .select()
+    .from(characters)
+    .where(eq(characters.projectId, shot.projectId));
+  const characterDescriptions = shotCharacters
+    .map((c) => `${c.name}: ${c.description}`)
+    .join("\n");
+
   const videoProvider = resolveVideoProvider(modelConfig);
 
   try {
@@ -702,6 +710,7 @@ async function handleSingleVideoGenerate(
           sceneDescription: shot.prompt || "",
           motionScript: shot.motionScript,
           cameraDirection: shot.cameraDirection || "static",
+          characterDescriptions,
         })
       : shot.prompt || "";
 
@@ -748,6 +757,14 @@ async function handleBatchVideoGenerate(
     return NextResponse.json({ results: [], message: "No eligible shots" });
   }
 
+  const batchCharacters = await db
+    .select()
+    .from(characters)
+    .where(eq(characters.projectId, projectId));
+  const characterDescriptions = batchCharacters
+    .map((c) => `${c.name}: ${c.description}`)
+    .join("\n");
+
   const videoProvider = resolveVideoProvider(modelConfig);
   const ratio = (payload?.ratio as string) || "16:9";
 
@@ -767,6 +784,7 @@ async function handleBatchVideoGenerate(
               sceneDescription: shot.prompt || "",
               motionScript: shot.motionScript,
               cameraDirection: shot.cameraDirection || "static",
+              characterDescriptions,
             })
           : shot.prompt || "";
 

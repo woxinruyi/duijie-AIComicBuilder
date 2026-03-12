@@ -12,6 +12,10 @@ export async function PATCH(
     prompt: string;
     duration: number;
     sequence: number;
+    startFrameDesc: string;
+    endFrameDesc: string;
+    motionScript: string;
+    cameraDirection: string;
   }>;
 
   const [updated] = await db
