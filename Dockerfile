@@ -8,6 +8,7 @@ RUN apk add --no-cache ffmpeg font-noto-cjk
 
 # --- Dependencies ---
 FROM base AS deps
+RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
