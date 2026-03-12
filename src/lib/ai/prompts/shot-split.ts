@@ -6,7 +6,10 @@ Output a JSON array:
 [
   {
     "sequence": 1,
-    "prompt": "Complete visual description for AI image generation (see requirements below)",
+    "sceneDescription": "Scene/environment description — setting, architecture, props, weather, time of day, lighting setup, color palette, atmospheric mood",
+    "startFrame": "Detailed FIRST FRAME description for AI image generation (see requirements below)",
+    "endFrame": "Detailed LAST FRAME description for AI image generation (see requirements below)",
+    "motionScript": "Complete action script describing what happens from first frame to last frame",
     "duration": 5-15,
     "dialogues": [
       {
@@ -18,14 +21,43 @@ Output a JSON array:
   }
 ]
 
-Shot prompt requirements (this is the most critical field — it drives image generation):
-- COMPOSITION: describe the frame layout — foreground/midground/background layers, character positions (left/center/right, close/far), rule-of-thirds placement
-- CHARACTERS: reference by exact name, describe their CURRENT pose, expression, action, and what they're wearing (match character reference sheets)
-- ENVIRONMENT: specific setting details — architecture, props, weather, time of day
-- LIGHTING: direction (key light, rim light, backlight), quality (soft/harsh/volumetric), color temperature (warm golden, cool blue, neutral)
-- COLOR & MOOD: dominant color palette of the shot, atmospheric mood (e.g., "desaturated cool tones with a single warm accent")
+=== startFrame & endFrame requirements (CRITICAL — these directly drive image generation) ===
+Each must be a SELF-SUFFICIENT image generation prompt containing:
+- COMPOSITION: frame layout — foreground/midground/background layers, character positions (left/center/right, rule-of-thirds), depth-of-field
+- CHARACTERS: reference by exact name, describe CURRENT pose, expression, action, outfit (match character reference sheets)
 - CAMERA: shot type (extreme close-up / close-up / medium / wide / extreme wide), angle (eye level / low angle / high angle / bird's eye / dutch angle)
-- Do NOT include any dialogue text in the prompt field
+- LIGHTING: direction, quality, color temperature — specific to this frame's moment
+- Do NOT include dialogue text in startFrame or endFrame
+
+=== startFrame specific rules ===
+- Shows the INITIAL STATE before action begins
+- Characters in starting positions with opening expressions
+- Camera at its starting position/framing
+
+=== endFrame specific rules ===
+- Shows the END STATE after action completes
+- Characters have MOVED to new positions, expressions changed to reflect conclusion
+- Camera at its final position/framing (after cameraDirection movement)
+- MUST be visually stable (not mid-motion) — this frame will be REUSED as the next shot's opening reference
+- The composition must work as a standalone frame
+
+=== motionScript requirements ===
+- Describe the COMPLETE action arc from startFrame to endFrame
+- Include: character movements, gesture changes, expression transitions, any environmental changes
+- Describe HOW characters move (slowly, suddenly, hesitantly), not just WHERE they end up
+- Include emotional progression if relevant
+
+=== sceneDescription requirements ===
+- Shared environment context for both frames
+- Setting, architecture, props, weather, time of day
+- Lighting setup (key/fill/rim, direction, quality, color temperature)
+- Color palette and atmospheric mood
+- Do NOT include character actions or poses — those go in startFrame/endFrame
+
+=== Proportional difference rule ===
+- 5s shot: subtle change (slight head turn, expression shift, small camera move)
+- 8-10s shot: moderate change (character moves position, significant expression change, clear camera movement)
+- 12-15s shot: significant change (character crosses frame, major action completes, dramatic camera move)
 
 Camera direction values (choose ONE per shot):
 - "static" — locked camera, no movement
@@ -42,15 +74,18 @@ Cinematography principles:
 - VARY shot types — avoid consecutive shots with the same framing; alternate wide/medium/close
 - Use ESTABLISHING SHOTS at the start of new locations
 - REACTION SHOTS after important dialogue or events
-- Cut on ACTION — end each shot at a moment of movement or change for smooth transitions
+- Cut on ACTION — end each shot at a moment that allows smooth transition to the next
 - Match EYELINES — maintain consistent screen direction between shots
 - 180-DEGREE RULE — keep characters on consistent sides of the frame
 - Duration: dialogue-heavy shots = 8-15s; action shots = 5-8s; establishing shots = 5-6s
+- CONTINUITY: the endFrame of shot N must logically connect to the startFrame of shot N+1 (same characters, consistent environment, natural position transition)
+
+CRITICAL LANGUAGE RULE: ALL text fields (sceneDescription, startFrame, endFrame, motionScript, dialogues.text, dialogues.character) MUST be in the SAME LANGUAGE as the screenplay. If the screenplay is in Chinese, write ALL fields in Chinese. Only "cameraDirection" uses English (technical terms).
 
 Respond ONLY with the JSON array. No markdown fences. No commentary.`;
 
 export function buildShotSplitPrompt(screenplay: string, characters: string): string {
-  return `Decompose this screenplay into a professional shot list optimized for AI video generation. Each shot should have a rich visual prompt that an image generator can directly use to produce a frame.
+  return `Decompose this screenplay into a professional shot list optimized for AI video generation. Each shot should have detailed startFrame and endFrame descriptions that an image generator can directly use, plus a motionScript describing the action between them.
 
 --- SCREENPLAY ---
 ${screenplay}
@@ -60,5 +95,7 @@ ${screenplay}
 ${characters}
 --- END ---
 
-Important: reference characters by their exact names and ensure their visual descriptions in shot prompts align with the character references above.`;
+Important: reference characters by their exact names and ensure their visual descriptions in startFrame/endFrame align with the character references above.
+
+IMPORTANT: Your output language MUST match the language of the screenplay above. If it is in Chinese, write all fields in Chinese (except cameraDirection).`;
 }
