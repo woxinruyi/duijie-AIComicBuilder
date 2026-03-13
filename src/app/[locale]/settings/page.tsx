@@ -1,48 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useModelStore } from "@/stores/model-store";
-import { ProviderCard } from "@/components/settings/provider-card";
-import { ProviderForm } from "@/components/settings/provider-form";
 import { DefaultModelPicker } from "@/components/settings/default-model-picker";
-import { Button } from "@/components/ui/button";
+import { ProviderSection } from "@/components/settings/provider-section";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Settings, Cpu, Zap } from "lucide-react";
+import { ArrowLeft, Settings, Zap, Type, ImageIcon, VideoIcon } from "lucide-react";
 import { LanguageSwitcher } from "@/components/language-switcher";
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
-  const tc = useTranslations("common");
   const router = useRouter();
-  const { providers, addProvider, removeProvider } = useModelStore();
-  const [selectedId, setSelectedId] = useState<string | null>(
-    providers.length > 0 ? providers[0].id : null
-  );
-
-  const selectedProvider = providers.find((p) => p.id === selectedId) || null;
-
-  function handleAdd() {
-    const id = addProvider({
-      name: "New Provider",
-      protocol: "openai",
-      capability: "text",
-      baseUrl: "https://api.openai.com",
-      apiKey: "",
-    });
-    setSelectedId(id);
-  }
-
-  function handleDelete(id: string) {
-    removeProvider(id);
-    if (selectedId === id) {
-      setSelectedId(
-        providers.length > 1
-          ? providers.find((p) => p.id !== id)?.id || null
-          : null
-      );
-    }
-  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -69,7 +36,7 @@ export default function SettingsPage() {
 
       <main className="flex-1 bg-[--surface] p-4 lg:p-6">
         <div className="mx-auto max-w-4xl animate-page-in space-y-5">
-          {/* Default model selection — top priority */}
+          {/* Default model selection */}
           <div className="rounded-2xl border border-[--border-subtle] bg-white p-5">
             <h3 className="mb-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[--text-muted]">
               <Zap className="h-3.5 w-3.5" />
@@ -78,56 +45,32 @@ export default function SettingsPage() {
             <DefaultModelPicker />
           </div>
 
-          {/* Provider section header */}
-          <div className="flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[--text-muted]">
-              <Cpu className="h-3.5 w-3.5" />
-              {t("providers")}
-            </h3>
-            <Button size="sm" variant="outline" onClick={handleAdd}>
-              <Plus className="h-3.5 w-3.5" />
-              {t("addProvider")}
-            </Button>
-          </div>
+          {/* Language Models section */}
+          <ProviderSection
+            capability="text"
+            label={t("languageModels")}
+            icon={<Type className="h-3.5 w-3.5" />}
+            defaultProtocol="openai"
+            defaultBaseUrl="https://api.openai.com"
+          />
 
-          {/* Provider cards — horizontal tabs */}
-          {providers.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {providers.map((p) => (
-                <ProviderCard
-                  key={p.id}
-                  provider={p}
-                  selected={p.id === selectedId}
-                  onSelect={() => setSelectedId(p.id)}
-                  onDelete={() => handleDelete(p.id)}
-                />
-              ))}
-            </div>
-          )}
+          {/* Image Models section */}
+          <ProviderSection
+            capability="image"
+            label={t("imageModels")}
+            icon={<ImageIcon className="h-3.5 w-3.5" />}
+            defaultProtocol="kling"
+            defaultBaseUrl="https://api.klingai.com"
+          />
 
-          {/* Provider form */}
-          {providers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[--border-subtle] bg-white/50 py-16">
-              <Cpu className="h-8 w-8 text-[--text-muted]" />
-              <p className="mt-3 text-sm text-[--text-muted]">
-                {t("noProviders")}
-              </p>
-              <Button size="sm" className="mt-4" onClick={handleAdd}>
-                <Plus className="h-3.5 w-3.5" />
-                {t("addProvider")}
-              </Button>
-            </div>
-          ) : selectedProvider ? (
-            <div className="rounded-2xl border border-[--border-subtle] bg-white p-5">
-              <ProviderForm key={selectedProvider.id} provider={selectedProvider} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center rounded-2xl border border-dashed border-[--border-subtle] bg-white/50 py-16">
-              <p className="text-sm text-[--text-muted]">
-                {t("selectProvider")}
-              </p>
-            </div>
-          )}
+          {/* Video Models section */}
+          <ProviderSection
+            capability="video"
+            label={t("videoModels")}
+            icon={<VideoIcon className="h-3.5 w-3.5" />}
+            defaultProtocol="kling"
+            defaultBaseUrl="https://api.klingai.com"
+          />
         </div>
       </main>
     </div>
