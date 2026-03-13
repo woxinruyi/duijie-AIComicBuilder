@@ -1,10 +1,17 @@
 "use client";
 
+import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useModelStore } from "@/stores/model-store";
 import { toast } from "sonner";
 import type { Capability } from "@/stores/model-store";
+
+const messageKeys: Record<Capability, string> = {
+  text: "notConfiguredText",
+  image: "notConfiguredImage",
+  video: "notConfiguredVideo",
+};
 
 /**
  * Returns a guard() function for the given model capability.
@@ -19,7 +26,7 @@ export function useModelGuard(capability: Capability): () => boolean {
   // Use selector pattern (consistent with codebase; avoids re-renders on unrelated store changes)
   const getModelConfig = useModelStore((s) => s.getModelConfig);
 
-  return function guard(): boolean {
+  return useCallback((): boolean => {
     // If the store hasn't hydrated from localStorage yet, allow through.
     // The API will handle missing config server-side.
     if (!useModelStore.persist.hasHydrated()) {
@@ -29,14 +36,7 @@ export function useModelGuard(capability: Capability): () => boolean {
     const config = getModelConfig();
 
     if (config[capability] === null) {
-      const messageKey =
-        capability === "text"
-          ? "notConfiguredText"
-          : capability === "image"
-            ? "notConfiguredImage"
-            : "notConfiguredVideo";
-
-      toast.warning(t(messageKey), {
+      toast.warning(t(messageKeys[capability]), {
         action: {
           label: t("goSettings"),
           onClick: () => router.push(`/${locale}/settings`),
@@ -46,5 +46,5 @@ export function useModelGuard(capability: Capability): () => boolean {
     }
 
     return true;
-  };
+  }, [capability, getModelConfig, locale, router, t]);
 }
