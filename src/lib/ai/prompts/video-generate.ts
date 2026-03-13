@@ -17,5 +17,5 @@ export function buildVideoPrompt(params: {
     return params.motionScript.trim();
   }
 
-  return segments.join("\n");
+  return `${segments.join("\n")}\nCamera: ${params.cameraDirection}`;
 }
