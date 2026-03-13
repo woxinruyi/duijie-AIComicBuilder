@@ -114,12 +114,13 @@ export function ProviderForm({ provider }: ProviderFormProps) {
             {getProtocolOptions(provider.capability).map((opt) => (
               <button
                 key={opt.value}
-                onClick={() =>
+                onClick={() => {
+                  const isDefaultUrl = !provider.baseUrl || (Object.values(DEFAULT_BASE_URLS) as string[]).includes(provider.baseUrl);
                   updateProvider(provider.id, {
                     protocol: opt.value,
-                    baseUrl: DEFAULT_BASE_URLS[opt.value],
-                  })
-                }
+                    ...(isDefaultUrl && { baseUrl: DEFAULT_BASE_URLS[opt.value] }),
+                  });
+                }}
                 className={`rounded-lg border px-2.5 py-[7px] text-xs transition-all ${
                   provider.protocol === opt.value
                     ? "border-primary/30 bg-primary/8 text-primary font-medium"
