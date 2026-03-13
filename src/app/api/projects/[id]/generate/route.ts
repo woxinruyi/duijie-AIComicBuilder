@@ -817,6 +817,16 @@ async function handleSingleVideoGenerate(
     .map((c) => `${c.name}: ${c.description}`)
     .join("\n");
 
+  const shotDialogues = await db
+    .select({ text: dialogues.text, characterId: dialogues.characterId, sequence: dialogues.sequence })
+    .from(dialogues)
+    .where(eq(dialogues.shotId, shotId))
+    .orderBy(asc(dialogues.sequence));
+  const dialogueList = shotDialogues.map((d) => ({
+    characterName: shotCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown",
+    text: d.text,
+  }));
+
   const videoProvider = resolveVideoProvider(modelConfig);
 
   try {
@@ -831,6 +841,7 @@ async function handleSingleVideoGenerate(
           cameraDirection: shot.cameraDirection || "static",
           duration: shot.duration ?? 10,
           characterDescriptions,
+          dialogues: dialogueList.length > 0 ? dialogueList : undefined,
         })
       : shot.prompt || "";
 
@@ -899,6 +910,16 @@ async function handleBatchVideoGenerate(
   const results: Array<{ shotId: string; sequence: number; status: "ok" | "error"; videoUrl?: string; error?: string }> = [];
   for (const shot of eligible) {
     try {
+      const shotDialogues = await db
+        .select({ text: dialogues.text, characterId: dialogues.characterId, sequence: dialogues.sequence })
+        .from(dialogues)
+        .where(eq(dialogues.shotId, shot.id))
+        .orderBy(asc(dialogues.sequence));
+      const dialogueList = shotDialogues.map((d) => ({
+        characterName: batchCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown",
+        text: d.text,
+      }));
+
       const videoPrompt = shot.motionScript
         ? buildVideoPrompt({
             sceneDescription: shot.prompt || "",
@@ -906,6 +927,7 @@ async function handleBatchVideoGenerate(
             cameraDirection: shot.cameraDirection || "static",
             duration: shot.duration ?? 10,
             characterDescriptions,
+            dialogues: dialogueList.length > 0 ? dialogueList : undefined,
           })
         : shot.prompt || "";
 

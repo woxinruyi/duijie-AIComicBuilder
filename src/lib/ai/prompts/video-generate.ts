@@ -4,6 +4,7 @@ export function buildVideoPrompt(params: {
   cameraDirection: string;
   duration?: number;
   characterDescriptions?: string;
+  dialogues?: Array<{ characterName: string; text: string }>;
 }): string {
   // motionScript contains per-segment camera directions — no need to repeat overall cameraDirection.
   // Reformat segments onto separate lines for readability.
@@ -12,10 +13,11 @@ export function buildVideoPrompt(params: {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (segments.length <= 1) {
-    // Fallback: no segments found, output as-is
-    return params.motionScript.trim();
-  }
+  const motionPart = segments.length > 1 ? segments.join("\n") : params.motionScript.trim();
 
-  return `${segments.join("\n")}\nCamera: ${params.cameraDirection}`;
+  const dialoguePart = params.dialogues?.length
+    ? "\nDialogue:\n" + params.dialogues.map((d) => `${d.characterName}: "${d.text}"`).join("\n")
+    : "";
+
+  return `${motionPart}\nCamera: ${params.cameraDirection}${dialoguePart}`;
 }
