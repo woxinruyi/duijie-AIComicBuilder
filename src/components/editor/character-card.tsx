@@ -20,6 +20,7 @@ interface CharacterCardProps {
   description: string;
   referenceImage: string | null;
   onUpdate: () => void;
+  batchGenerating?: boolean;
 }
 
 export function CharacterCard({
@@ -29,6 +30,7 @@ export function CharacterCard({
   description,
   referenceImage,
   onUpdate,
+  batchGenerating,
 }: CharacterCardProps) {
   const t = useTranslations();
   const getModelConfig = useModelStore((s) => s.getModelConfig);
@@ -37,6 +39,7 @@ export function CharacterCard({
   const [generating, setGenerating] = useState(false);
   const [lightbox, setLightbox] = useState(false);
   const imageGuard = useModelGuard("image");
+  const isGenerating = generating || (!!batchGenerating && !referenceImage);
 
   async function handleSave() {
     await apiFetch(`/api/projects/${projectId}/characters/${id}`, {
@@ -79,7 +82,7 @@ export function CharacterCard({
             className="h-36 w-full cursor-pointer rounded-xl object-cover"
             onClick={() => setLightbox(true)}
           />
-        ) : generating ? (
+        ) : isGenerating ? (
           <div className="h-24 w-24 rounded-2xl animate-shimmer" />
         ) : (
           <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-accent/10 text-3xl font-bold text-primary">
@@ -107,16 +110,16 @@ export function CharacterCard({
             <InlineModelPicker capability="image" />
             <Button
               onClick={handleGenerateImage}
-              disabled={generating}
+              disabled={isGenerating}
               className="w-full"
               size="sm"
             >
-              {generating ? (
+              {isGenerating ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Sparkles className="h-3.5 w-3.5" />
               )}
-              {generating ? t("common.generating") : t("character.generateImage")}
+              {isGenerating ? t("common.generating") : t("character.generateImage")}
             </Button>
           </div>
       </div>
