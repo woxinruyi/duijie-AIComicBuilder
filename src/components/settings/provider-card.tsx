@@ -20,9 +20,12 @@ export function ProviderCard({
   const checkedCount = provider.models.filter((m) => m.checked).length;
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`group relative flex flex-shrink-0 items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-all duration-200 ${
+      onKeyDown={(e) => e.key === "Enter" || e.key === " " ? onSelect() : undefined}
+      className={`group relative flex flex-shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-all duration-200 ${
         selected
           ? "border-primary/30 bg-primary/5 shadow-sm shadow-primary/5"
           : "border-[--border-subtle] bg-white hover:border-[--border-hover] hover:shadow-sm"
@@ -61,6 +64,6 @@ export function ProviderCard({
       >
         <X className="h-3 w-3" />
       </button>
-    </button>
+    </div>
   );
 }
