@@ -125,6 +125,10 @@ export async function POST(
     return handleSingleSceneFrame(projectId, payload, modelConfig);
   }
 
+  if (action === "batch_scene_frame") {
+    return handleBatchSceneFrame(projectId, payload, modelConfig);
+  }
+
   if (action === "single_reference_video") {
     return handleSingleReferenceVideo(projectId, payload, modelConfig);
   }
@@ -450,6 +454,7 @@ async function handleShotSplitStream(
           startFrame: string;
           endFrame: string;
           motionScript: string;
+          videoScript?: string;
           duration: number;
           dialogues: Array<{ character: string; text: string }>;
           cameraDirection?: string;
@@ -465,6 +470,7 @@ async function handleShotSplitStream(
             startFrameDesc: shot.startFrame,
             endFrameDesc: shot.endFrame,
             motionScript: shot.motionScript,
+            videoScript: shot.videoScript ?? null,
             cameraDirection: shot.cameraDirection || "static",
             duration: shot.duration,
           });
@@ -535,6 +541,7 @@ Current shot (sequence ${shot.sequence}):
 - Start frame: ${shot.startFrameDesc || ""}
 - End frame: ${shot.endFrameDesc || ""}
 - Motion script: ${shot.motionScript || ""}
+- Video script: ${shot.videoScript || ""}
 - Camera direction: ${shot.cameraDirection || "static"}
 - Duration: ${shot.duration}s
 
@@ -547,6 +554,7 @@ Return ONLY a JSON object (no markdown fences) with these fields:
   "startFrameDesc": "rewritten start frame description",
   "endFrameDesc": "rewritten end frame description",
   "motionScript": "rewritten motion script in time-segmented format (0-Xs: ... Xs-Ys: ...)",
+  "videoScript": "rewritten concise video model prompt: 1-2 sentences, no timestamps, just core motion and camera arc",
   "cameraDirection": "camera direction (keep original or adjust)"
 }
 
@@ -562,6 +570,7 @@ IMPORTANT: Keep the same scene, characters, and narrative intent. Only rephrase 
       startFrameDesc: string;
       endFrameDesc: string;
       motionScript: string;
+      videoScript?: string;
       cameraDirection: string;
     };
 
@@ -572,6 +581,7 @@ IMPORTANT: Keep the same scene, characters, and narrative intent. Only rephrase 
         startFrameDesc: parsed.startFrameDesc,
         endFrameDesc: parsed.endFrameDesc,
         motionScript: parsed.motionScript,
+        videoScript: parsed.videoScript ?? null,
         cameraDirection: parsed.cameraDirection,
       })
       .where(eq(shots.id, shotId));
@@ -1020,6 +1030,9 @@ async function handleSingleSceneFrame(
       sceneDescription: shot.prompt || "",
       charRefMapping,
       characterDescriptions,
+      cameraDirection: shot.cameraDirection,
+      startFrameDesc: shot.startFrameDesc,
+      motionScript: shot.motionScript,
     });
 
     console.log(`[SingleSceneFrame] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
@@ -1043,6 +1056,103 @@ async function handleSingleSceneFrame(
       { status: 500 }
     );
   }
+}
+
+// --- batch_scene_frame: generate scene reference frames for all eligible shots ---
+
+async function handleBatchSceneFrame(
+  projectId: string,
+  payload?: Record<string, unknown>,
+  modelConfig?: ModelConfig
+) {
+  if (!modelConfig?.image) {
+    return NextResponse.json({ error: "No image model configured" }, { status: 400 });
+  }
+
+  const overwrite = payload?.overwrite === true;
+
+  const allShots = await db
+    .select()
+    .from(shots)
+    .where(eq(shots.projectId, projectId))
+    .orderBy(asc(shots.sequence));
+
+  const eligible = allShots.filter(
+    (s) => s.status !== "generating" && (overwrite || !s.sceneRefFrame)
+  );
+  if (eligible.length === 0) {
+    return NextResponse.json({ results: [], message: "No eligible shots" });
+  }
+
+  const projectCharacters = await db
+    .select()
+    .from(characters)
+    .where(eq(characters.projectId, projectId));
+
+  const charRefs = projectCharacters
+    .filter((c) => !!c.referenceImage)
+    .map((c) => ({ name: c.name, imagePath: c.referenceImage as string }));
+
+  if (charRefs.length === 0) {
+    return NextResponse.json(
+      { error: "No character reference images available." },
+      { status: 400 }
+    );
+  }
+
+  const charRefMapping = charRefs.map((c, i) => `${c.name}=图片${i + 1}`).join("，");
+  const characterDescriptions = projectCharacters
+    .map((c) => `${c.name}: ${c.description}`)
+    .join("\n");
+
+  const imageProvider = resolveImageProvider(modelConfig);
+
+  await Promise.all(
+    eligible.map((shot) =>
+      db.update(shots).set({ status: "generating" }).where(eq(shots.id, shot.id))
+    )
+  );
+
+  const results: Array<{
+    shotId: string;
+    sequence: number;
+    status: "ok" | "error";
+    sceneRefFrame?: string;
+    error?: string;
+  }> = [];
+
+  for (const shot of eligible) {
+    try {
+      const sceneFramePrompt = buildSceneFramePrompt({
+        sceneDescription: shot.prompt || "",
+        charRefMapping,
+        characterDescriptions,
+        cameraDirection: shot.cameraDirection,
+        startFrameDesc: shot.startFrameDesc,
+        motionScript: shot.motionScript,
+      });
+
+      console.log(`[BatchSceneFrame] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
+
+      const sceneFramePath = await imageProvider.generateImage(sceneFramePrompt, {
+        quality: "hd",
+        referenceImages: charRefs.map((c) => c.imagePath),
+      });
+
+      await db
+        .update(shots)
+        .set({ sceneRefFrame: sceneFramePath, status: "pending" })
+        .where(eq(shots.id, shot.id));
+
+      results.push({ shotId: shot.id, sequence: shot.sequence, status: "ok", sceneRefFrame: sceneFramePath });
+    } catch (err) {
+      console.error(`[BatchSceneFrame] Error for shot ${shot.sequence}:`, err);
+      await db.update(shots).set({ status: "failed" }).where(eq(shots.id, shot.id));
+      results.push({ shotId: shot.id, sequence: shot.sequence, status: "error", error: extractErrorMessage(err) });
+    }
+  }
+
+  return NextResponse.json({ results });
 }
 
 // --- single_reference_video: text2video with character reference images ---
@@ -1115,6 +1225,9 @@ async function handleSingleReferenceVideo(
         sceneDescription: shot.prompt || "",
         charRefMapping,
         characterDescriptions,
+        cameraDirection: shot.cameraDirection,
+        startFrameDesc: shot.startFrameDesc,
+        motionScript: shot.motionScript,
       });
       console.log(`[SingleReferenceVideo] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
       sceneFramePath = await imageProvider.generateImage(sceneFramePrompt, {
@@ -1255,6 +1368,9 @@ async function handleBatchReferenceVideo(
         sceneDescription: shot.prompt || "",
         charRefMapping,
         characterDescriptions,
+        cameraDirection: shot.cameraDirection,
+        startFrameDesc: shot.startFrameDesc,
+        motionScript: shot.motionScript,
       });
 
       console.log(`[BatchReferenceVideo] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
