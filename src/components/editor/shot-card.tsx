@@ -97,6 +97,7 @@ export function ShotCard({
   const [editCameraDirection, setEditCameraDirection] = useState(cameraDirection ?? "static");
   const [editDuration, setEditDuration] = useState(duration);
   const [generatingFrames, setGeneratingFrames] = useState(false);
+  const [generatingSceneFrame, setGeneratingSceneFrame] = useState(false);
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [rewritingText, setRewritingText] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -168,6 +169,27 @@ export function ShotCard({
       toast.error(err instanceof Error ? err.message : t("common.generationFailed"));
     }
     setGeneratingVideo(false);
+  }
+
+  async function handleGenerateSceneFrame() {
+    if (!imageGuard()) return;
+    setGeneratingSceneFrame(true);
+    try {
+      await apiFetch(`/api/projects/${projectId}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "single_scene_frame",
+          payload: { shotId: id },
+          modelConfig: getModelConfig(),
+        }),
+      });
+      onUpdate();
+    } catch (err) {
+      console.error("Scene frame generate error:", err);
+      toast.error(err instanceof Error ? err.message : t("common.generationFailed"));
+    }
+    setGeneratingSceneFrame(false);
   }
 
   async function handleGenerateReferenceVideo() {
@@ -320,18 +342,33 @@ export function ShotCard({
                 </Button>
               )}
               {generationMode === "reference" ? (
-                <Button
-                  size="xs"
-                  onClick={(e) => { e.stopPropagation(); handleGenerateReferenceVideo(); }}
-                  disabled={isGeneratingVideo}
-                >
-                  {isGeneratingVideo ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
-                  {isGeneratingVideo ? t("common.generating") : t("project.generateVideo")}
-                </Button>
+                <>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={(e) => { e.stopPropagation(); handleGenerateSceneFrame(); }}
+                    disabled={generatingSceneFrame || isGeneratingVideo}
+                  >
+                    {generatingSceneFrame ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <ImageIcon className="h-3 w-3" />
+                    )}
+                    {generatingSceneFrame ? t("common.generating") : t("shot.firstFrame")}
+                  </Button>
+                  <Button
+                    size="xs"
+                    onClick={(e) => { e.stopPropagation(); handleGenerateReferenceVideo(); }}
+                    disabled={generatingSceneFrame || isGeneratingVideo}
+                  >
+                    {isGeneratingVideo ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3" />
+                    )}
+                    {isGeneratingVideo ? t("common.generating") : t("project.generateVideo")}
+                  </Button>
+                </>
               ) : (firstFrame && lastFrame && (
                 <Button
                   size="xs"
@@ -507,7 +544,25 @@ export function ShotCard({
               )}
               {rewritingText ? t("common.generating") : t("shot.rewriteText")}
             </Button>
-            {generationMode !== "reference" && (
+            {generationMode === "reference" ? (
+              <>
+                <div className="h-4 w-px bg-[--border-subtle]" />
+                <InlineModelPicker capability="image" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGenerateSceneFrame}
+                  disabled={generatingSceneFrame || isGeneratingVideo || rewritingText}
+                >
+                  {generatingSceneFrame ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-3.5 w-3.5" />
+                  )}
+                  {generatingSceneFrame ? t("common.generating") : t("shot.firstFrame")}
+                </Button>
+              </>
+            ) : (
               <>
                 <div className="h-4 w-px bg-[--border-subtle]" />
                 <InlineModelPicker capability="image" />

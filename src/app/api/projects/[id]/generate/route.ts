@@ -121,6 +121,10 @@ export async function POST(
     return handleBatchVideoGenerate(projectId, payload, modelConfig);
   }
 
+  if (action === "single_scene_frame") {
+    return handleSingleSceneFrame(projectId, payload, modelConfig);
+  }
+
   if (action === "single_reference_video") {
     return handleSingleReferenceVideo(projectId, payload, modelConfig);
   }
@@ -967,6 +971,80 @@ async function handleBatchVideoGenerate(
   return NextResponse.json({ results });
 }
 
+// --- single_scene_frame: generate Toonflow-style scene reference frame only ---
+
+async function handleSingleSceneFrame(
+  projectId: string,
+  payload?: Record<string, unknown>,
+  modelConfig?: ModelConfig
+) {
+  const shotId = payload?.shotId as string | undefined;
+  if (!shotId) {
+    return NextResponse.json({ error: "No shotId provided" }, { status: 400 });
+  }
+  if (!modelConfig?.image) {
+    return NextResponse.json({ error: "No image model configured" }, { status: 400 });
+  }
+
+  const [shot] = await db.select().from(shots).where(eq(shots.id, shotId));
+  if (!shot) {
+    return NextResponse.json({ error: "Shot not found" }, { status: 404 });
+  }
+
+  const projectCharacters = await db
+    .select()
+    .from(characters)
+    .where(eq(characters.projectId, shot.projectId));
+
+  const charRefs = projectCharacters
+    .filter((c) => !!c.referenceImage)
+    .map((c) => ({ name: c.name, imagePath: c.referenceImage as string }));
+
+  if (charRefs.length === 0) {
+    return NextResponse.json(
+      { error: "No character reference images available. Please generate character reference images first." },
+      { status: 400 }
+    );
+  }
+
+  const charRefMapping = charRefs.map((c, i) => `${c.name}=图片${i + 1}`).join("，");
+  const characterDescriptions = projectCharacters
+    .map((c) => `${c.name}: ${c.description}`)
+    .join("\n");
+
+  try {
+    await db.update(shots).set({ status: "generating" }).where(eq(shots.id, shotId));
+
+    const imageProvider = resolveImageProvider(modelConfig);
+    const sceneFramePrompt = buildSceneFramePrompt({
+      sceneDescription: shot.prompt || "",
+      charRefMapping,
+      characterDescriptions,
+    });
+
+    console.log(`[SingleSceneFrame] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
+
+    const sceneFramePath = await imageProvider.generateImage(sceneFramePrompt, {
+      quality: "hd",
+      referenceImages: charRefs.map((c) => c.imagePath),
+    });
+
+    await db
+      .update(shots)
+      .set({ sceneRefFrame: sceneFramePath, status: "pending" })
+      .where(eq(shots.id, shotId));
+
+    return NextResponse.json({ shotId, sceneRefFrame: sceneFramePath, status: "ok" });
+  } catch (err) {
+    console.error(`[SingleSceneFrame] Error for shot ${shot.sequence}:`, err);
+    await db.update(shots).set({ status: "failed" }).where(eq(shots.id, shotId));
+    return NextResponse.json(
+      { shotId, status: "error", error: extractErrorMessage(err) },
+      { status: 500 }
+    );
+  }
+}
+
 // --- single_reference_video: text2video with character reference images ---
 
 async function handleSingleReferenceVideo(
@@ -1029,23 +1107,24 @@ async function handleSingleReferenceVideo(
   try {
     await db.update(shots).set({ status: "generating" }).where(eq(shots.id, shotId));
 
-    // Step 1: Generate scene reference frame (Toonflow-style)
-    const imageProvider = resolveImageProvider(modelConfig);
-    const sceneFramePrompt = buildSceneFramePrompt({
-      sceneDescription: shot.prompt || "",
-      charRefMapping,
-      characterDescriptions,
-    });
-
-    console.log(`[SingleReferenceVideo] Shot ${shot.sequence}: generating scene frame with ${charRefs.length} character refs, mapping="${charRefMapping}"`);
-
-    const sceneFramePath = await imageProvider.generateImage(sceneFramePrompt, {
-      quality: "hd",
-      referenceImages: charRefs.map((c) => c.imagePath),
-    });
-
-    // Save scene frame for display in UI (separate field — does not pollute firstFrame used by keyframe mode)
-    await db.update(shots).set({ sceneRefFrame: sceneFramePath }).where(eq(shots.id, shotId));
+    // Step 1: Reuse existing scene ref frame, or generate a new one (Toonflow-style)
+    let sceneFramePath = shot.sceneRefFrame ?? null;
+    if (!sceneFramePath) {
+      const imageProvider = resolveImageProvider(modelConfig);
+      const sceneFramePrompt = buildSceneFramePrompt({
+        sceneDescription: shot.prompt || "",
+        charRefMapping,
+        characterDescriptions,
+      });
+      console.log(`[SingleReferenceVideo] Shot ${shot.sequence}: generating scene frame, mapping="${charRefMapping}"`);
+      sceneFramePath = await imageProvider.generateImage(sceneFramePrompt, {
+        quality: "hd",
+        referenceImages: charRefs.map((c) => c.imagePath),
+      });
+      await db.update(shots).set({ sceneRefFrame: sceneFramePath }).where(eq(shots.id, shotId));
+    } else {
+      console.log(`[SingleReferenceVideo] Shot ${shot.sequence}: reusing existing scene frame`);
+    }
 
     // Step 2: Generate video using scene frame as initial image
     const videoProvider = resolveVideoProvider(modelConfig);
