@@ -40,6 +40,33 @@ import { assembleVideo } from "@/lib/video/ffmpeg";
 
 export const maxDuration = 300;
 
+/**
+ * Check if a character is visible on-screen by looking for their name
+ * in the videoScript or startFrameDesc fields.
+ */
+function isCharacterOnScreen(
+  characterName: string,
+  videoScript: string,
+  startFrameDesc: string | null | undefined
+): boolean {
+  const text = `${videoScript} ${startFrameDesc ?? ""}`;
+  return text.includes(characterName);
+}
+
+/**
+ * Extract visual hint from videoScript for a character.
+ * Looks for pattern: CharName（hint） or CharName (hint)
+ */
+function extractVisualHint(
+  characterName: string,
+  videoScript: string
+): string | null {
+  const escaped = characterName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`${escaped}[（(]([^）)]+)[）)]`);
+  const match = videoScript.match(regex);
+  return match ? match[1] : null;
+}
+
 async function getVersionedUploadDir(versionId: string | null | undefined): Promise<string> {
   if (!versionId) return process.env.UPLOAD_DIR || "./uploads";
   const [version] = await db
@@ -944,10 +971,6 @@ async function handleSingleVideoGenerate(
     .from(dialogues)
     .where(eq(dialogues.shotId, shotId))
     .orderBy(asc(dialogues.sequence));
-  const dialogueList = shotDialogues.map((d) => ({
-    characterName: shotCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown",
-    text: d.text,
-  }));
 
   const videoProvider = resolveVideoProvider(modelConfig, versionedUploadDir);
 
@@ -961,6 +984,24 @@ async function handleSingleVideoGenerate(
     const effectiveDuration = Math.min(shot.duration ?? 10, videoMaxDuration);
 
     const videoScript = shot.videoScript || shot.motionScript || shot.prompt || "";
+    const videoContextForDialogue = videoScript;
+    const onScreenDialogueChars = shotDialogues
+      .map((d) => shotCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
+      .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
+    const needsHint = onScreenDialogueChars.length >= 2;
+    const dialogueList = shotDialogues.map((d) => {
+      const characterName = shotCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown";
+      const onScreen = isCharacterOnScreen(characterName, videoContextForDialogue, shot.startFrameDesc);
+      const visualHint = (needsHint && onScreen)
+        ? extractVisualHint(characterName, videoContextForDialogue) ?? undefined
+        : undefined;
+      return {
+        characterName,
+        text: d.text,
+        offscreen: !onScreen,
+        visualHint,
+      };
+    });
     const videoPrompt = shot.videoPrompt || buildVideoPrompt({
       videoScript,
       cameraDirection: shot.cameraDirection || "static",
@@ -1052,12 +1093,27 @@ async function handleBatchVideoGenerate(
         .from(dialogues)
         .where(eq(dialogues.shotId, shot.id))
         .orderBy(asc(dialogues.sequence));
-      const dialogueList = shotDialogues.map((d) => ({
-        characterName: batchCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown",
-        text: d.text,
-      }));
 
       const videoScript = shot.videoScript || shot.motionScript || shot.prompt || "";
+      const videoContextForDialogue = videoScript;
+      const onScreenDialogueChars = shotDialogues
+        .map((d) => batchCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
+        .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
+      const needsHint = onScreenDialogueChars.length >= 2;
+      const dialogueList = shotDialogues.map((d) => {
+        const characterName = batchCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown";
+        const onScreen = isCharacterOnScreen(characterName, videoContextForDialogue, shot.startFrameDesc);
+        const visualHint = (needsHint && onScreen)
+          ? extractVisualHint(characterName, videoContextForDialogue) ?? undefined
+          : undefined;
+        return {
+          characterName,
+          text: d.text,
+          offscreen: !onScreen,
+          visualHint,
+        };
+      });
+
       const videoPrompt = shot.videoPrompt || buildVideoPrompt({
         videoScript,
         cameraDirection: shot.cameraDirection || "static",
@@ -1329,10 +1385,24 @@ async function handleSingleReferenceVideo(
     .from(dialogues)
     .where(eq(dialogues.shotId, shotId))
     .orderBy(asc(dialogues.sequence));
-  const dialogueList = shotDialogues.map((d) => ({
-    characterName: projectCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown",
-    text: d.text,
-  }));
+  const videoContextForDialogue = shot.motionScript || shot.videoScript || shot.prompt || "";
+  const onScreenDialogueChars = shotDialogues
+    .map((d) => projectCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
+    .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
+  const needsHint = onScreenDialogueChars.length >= 2;
+  const dialogueList = shotDialogues.map((d) => {
+    const characterName = projectCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown";
+    const onScreen = isCharacterOnScreen(characterName, videoContextForDialogue, shot.startFrameDesc);
+    const visualHint = (needsHint && onScreen)
+      ? extractVisualHint(characterName, videoContextForDialogue) ?? undefined
+      : undefined;
+    return {
+      characterName,
+      text: d.text,
+      offscreen: !onScreen,
+      visualHint,
+    };
+  });
 
   const ratio = (payload?.ratio as string) || "16:9";
 
@@ -1515,10 +1585,24 @@ async function handleBatchReferenceVideo(
         .from(dialogues)
         .where(eq(dialogues.shotId, shot.id))
         .orderBy(asc(dialogues.sequence));
-      const dialogueList = shotDialogues.map((d) => ({
-        characterName: projectCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown",
-        text: d.text,
-      }));
+      const videoContextForDialogue = shot.motionScript || shot.videoScript || shot.prompt || "";
+      const onScreenDialogueChars = shotDialogues
+        .map((d) => projectCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
+        .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
+      const needsHint = onScreenDialogueChars.length >= 2;
+      const dialogueList = shotDialogues.map((d) => {
+        const characterName = projectCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown";
+        const onScreen = isCharacterOnScreen(characterName, videoContextForDialogue, shot.startFrameDesc);
+        const visualHint = (needsHint && onScreen)
+          ? extractVisualHint(characterName, videoContextForDialogue) ?? undefined
+          : undefined;
+        return {
+          characterName,
+          text: d.text,
+          offscreen: !onScreen,
+          visualHint,
+        };
+      });
 
       // Step 1: Generate scene reference frame (Toonflow-style)
       const sceneFramePrompt = buildSceneFramePrompt({
@@ -1707,10 +1791,24 @@ async function handleSingleVideoPrompt(
     .from(dialogues)
     .where(eq(dialogues.shotId, shotId))
     .orderBy(asc(dialogues.sequence));
-  const dialogueList = shotDialogues.map((d) => ({
-    characterName: shotCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown",
-    text: d.text,
-  }));
+  const videoContextForDialogue = shot.videoScript || shot.motionScript || shot.prompt || "";
+  const onScreenDialogueChars = shotDialogues
+    .map((d) => shotCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
+    .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
+  const needsHint = onScreenDialogueChars.length >= 2;
+  const dialogueList = shotDialogues.map((d) => {
+    const characterName = shotCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown";
+    const onScreen = isCharacterOnScreen(characterName, videoContextForDialogue, shot.startFrameDesc);
+    const visualHint = (needsHint && onScreen)
+      ? extractVisualHint(characterName, videoContextForDialogue) ?? undefined
+      : undefined;
+    return {
+      characterName,
+      text: d.text,
+      offscreen: !onScreen,
+      visualHint,
+    };
+  });
 
   try {
     const videoModelId = modelConfig?.video?.modelId;
@@ -1769,12 +1867,26 @@ async function handleBatchVideoPrompt(
         .from(dialogues)
         .where(eq(dialogues.shotId, shot.id))
         .orderBy(asc(dialogues.sequence));
-      const dialogueList = shotDialogues.map((d) => ({
-        characterName: batchCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown",
-        text: d.text,
-      }));
+      const videoContextForDialogue = shot.videoScript || shot.motionScript || shot.prompt || "";
+      const onScreenDialogueChars = shotDialogues
+        .map((d) => batchCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown")
+        .filter((name) => isCharacterOnScreen(name, videoContextForDialogue, shot.startFrameDesc));
+      const needsHint = onScreenDialogueChars.length >= 2;
+      const dialogueList = shotDialogues.map((d) => {
+        const characterName = batchCharacters.find((c) => c.id === d.characterId)?.name ?? "Unknown";
+        const onScreen = isCharacterOnScreen(characterName, videoContextForDialogue, shot.startFrameDesc);
+        const visualHint = (needsHint && onScreen)
+          ? extractVisualHint(characterName, videoContextForDialogue) ?? undefined
+          : undefined;
+        return {
+          characterName,
+          text: d.text,
+          offscreen: !onScreen,
+          visualHint,
+        };
+      });
 
-      const motionContext = shot.motionScript || shot.videoScript || shot.prompt || "";
+      const motionContext = shot.videoScript || shot.motionScript || shot.prompt || "";
       const promptRequest = buildRefVideoPromptRequest({
         motionScript: motionContext,
         cameraDirection: shot.cameraDirection || "static",

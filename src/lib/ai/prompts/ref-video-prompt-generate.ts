@@ -32,7 +32,7 @@ export function buildRefVideoPromptRequest(params: {
   motionScript: string;
   cameraDirection: string;
   duration: number;
-  dialogues?: Array<{ characterName: string; text: string }>;
+  dialogues?: Array<{ characterName: string; text: string; offscreen?: boolean; visualHint?: string }>;
 }): string {
   const lines: string[] = [
     `Based on the rendered scene image above, write a Seedance-style video prompt in the same language as the screenplay action below.`,
