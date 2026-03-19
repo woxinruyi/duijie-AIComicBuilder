@@ -447,10 +447,16 @@ export function ShotDrawer({
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[--text-muted]">{t("shot.stepVideo")}</p>
             {hasVideo && (
               <div
-                className="mb-2 overflow-hidden rounded-lg border border-[--border-subtle] cursor-pointer"
+                className="group relative mb-2 overflow-hidden rounded-xl border border-[--border-subtle] bg-black cursor-pointer"
+                style={{ aspectRatio: "16/9" }}
                 onClick={() => setPreviewSrc(uploadUrl(shot.videoUrl!))}
               >
-                <video className="w-full max-h-32 object-cover" src={uploadUrl(shot.videoUrl!)} />
+                <video className="h-full w-full object-contain" src={uploadUrl(shot.videoUrl!)} />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg">
+                    <VideoIcon className="h-4 w-4 text-[--text-primary] translate-x-0.5" />
+                  </div>
+                </div>
               </div>
             )}
             <Button
