@@ -56,6 +56,9 @@ interface ShotCardProps {
   videoRatio?: string;
   isCompact?: boolean;
   onOpenDrawer?: (id: string) => void;
+  batchGeneratingFrames?: boolean;
+  batchGeneratingVideoPrompts?: boolean;
+  batchGeneratingVideos?: boolean;
 }
 
 type StepState = "done" | "generating" | "error" | "idle";
@@ -144,6 +147,9 @@ export function ShotCard({
   videoRatio = "16:9",
   isCompact = false,
   onOpenDrawer,
+  batchGeneratingFrames = false,
+  batchGeneratingVideoPrompts = false,
+  batchGeneratingVideos = false,
 }: ShotCardProps) {
   const t = useTranslations();
   const getModelConfig = useModelStore((s) => s.getModelConfig);
@@ -191,12 +197,12 @@ export function ShotCard({
   // Step states
   const textState: StepState = rewritingText ? "generating" : hasText ? "done" : "idle";
   const frameState: StepState =
-    generatingFrames || generatingSceneFrame ? "generating"
+    generatingFrames || generatingSceneFrame || batchGeneratingFrames ? "generating"
     : status === "failed" && !hasFrame ? "error"
     : hasFrame ? "done" : "idle";
-  const promptState: StepState = generatingPrompt ? "generating" : hasVideoPrompt ? "done" : "idle";
+  const promptState: StepState = generatingPrompt || batchGeneratingVideoPrompts ? "generating" : hasVideoPrompt ? "done" : "idle";
   const videoState: StepState =
-    generatingVideo || (isGenerating && !hasVideo) ? "generating"
+    generatingVideo || batchGeneratingVideos || (isGenerating && !hasVideo) ? "generating"
     : status === "failed" && !hasVideo ? "error"
     : hasVideo ? "done" : "idle";
 

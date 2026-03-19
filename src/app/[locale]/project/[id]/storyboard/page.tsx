@@ -733,6 +733,9 @@ export default function StoryboardPage() {
               videoRatio={videoRatio}
               isCompact={openDrawerShotId !== null}
               onOpenDrawer={(id) => setOpenDrawerShotId(id)}
+              batchGeneratingFrames={generationMode === "reference" ? generatingSceneFrames : generatingFrames}
+              batchGeneratingVideoPrompts={generatingVideoPrompts}
+              batchGeneratingVideos={generatingVideos}
             />
           ))}
         </div>
