@@ -523,13 +523,13 @@ export function ShotCard({
             size="xs"
             variant={nextStep === "frame" ? "default" : "outline"}
             onClick={generationMode === "reference" ? handleGenerateSceneFrame : handleGenerateFrames}
-            disabled={generatingFrames || generatingSceneFrame || generatingVideo}
+            disabled={generatingFrames || generatingSceneFrame || generatingVideo || batchGeneratingFrames}
           >
-            {(generatingFrames || generatingSceneFrame)
+            {(generatingFrames || generatingSceneFrame || batchGeneratingFrames)
               ? <Loader2 className="h-3 w-3 animate-spin" />
               : <ImageIcon className="h-3 w-3" />
             }
-            {(generatingFrames || generatingSceneFrame)
+            {(generatingFrames || generatingSceneFrame || batchGeneratingFrames)
               ? t("common.generating")
               : hasFrame ? t("shot.regenerateFrames") : t("project.generateFrames")
             }
@@ -551,10 +551,10 @@ export function ShotCard({
             size="xs"
             variant={nextStep === "prompt" ? "default" : "outline"}
             onClick={handleGenerateVideoPrompt}
-            disabled={generatingPrompt || !hasFrame}
+            disabled={generatingPrompt || batchGeneratingVideoPrompts || !hasFrame}
           >
-            {generatingPrompt ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {generatingPrompt
+            {(generatingPrompt || batchGeneratingVideoPrompts) ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {(generatingPrompt || batchGeneratingVideoPrompts)
               ? t("common.generating")
               : hasVideoPrompt ? t("shot.regeneratePrompt") : t("shot.generateVideoPrompt")
             }
@@ -579,13 +579,13 @@ export function ShotCard({
             size="xs"
             variant={nextStep === "video" ? "default" : "outline"}
             onClick={handleGenerateVideo}
-            disabled={generatingVideo || isGenerating || (generationMode === "keyframe" && !hasFramePair)}
+            disabled={generatingVideo || batchGeneratingVideos || isGenerating || (generationMode === "keyframe" && !hasFramePair)}
           >
-            {(generatingVideo || (isGenerating && !hasVideo))
+            {(generatingVideo || batchGeneratingVideos || (isGenerating && !hasVideo))
               ? <Loader2 className="h-3 w-3 animate-spin" />
               : <VideoIcon className="h-3 w-3" />
             }
-            {(generatingVideo || (isGenerating && !hasVideo))
+            {(generatingVideo || batchGeneratingVideos || (isGenerating && !hasVideo))
               ? t("common.generating")
               : hasVideo ? t("shot.regenerateVideo") : t("project.generateVideo")
             }
