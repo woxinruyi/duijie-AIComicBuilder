@@ -4,6 +4,7 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText } from "lucide-react";
 import { ProjectPromptCards } from "@/components/prompt-templates/project-prompt-cards";
+import { useTranslations } from "next-intl";
 
 export default function ProjectPromptsPage({
   params,
@@ -12,6 +13,7 @@ export default function ProjectPromptsPage({
 }) {
   const { id: projectId } = use(params);
   const router = useRouter();
+  const t = useTranslations("promptTemplates");
 
   return (
     <div className="flex-1 overflow-y-auto bg-[--surface] p-6">
@@ -29,10 +31,10 @@ export default function ProjectPromptsPage({
           </div>
           <div>
             <h2 className="font-display text-xl font-bold tracking-tight text-[--text-primary]">
-              项目提示词
+              {t("title")}
             </h2>
             <p className="text-xs text-[--text-muted]">
-              为此项目配置专属 AI 提示词，覆盖全局默认设置
+              {t("project.useProjectPromptsDesc")}
             </p>
           </div>
         </div>

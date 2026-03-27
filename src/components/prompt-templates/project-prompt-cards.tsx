@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2, Edit, RotateCcw, FileText } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -45,14 +45,9 @@ const CATEGORY_EMOJI: Record<string, string> = {
   video: "🎥",
 };
 
-// ── Name key → human-readable fallback map ────────────────
-// We display the raw nameKey split on underscores since we don't have access
-// to the full i18n namespace here (could be improved by passing translations).
-function formatNameKey(nameKey: string): string {
-  return nameKey
-    .replace(/^prompts\./, "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+/** Strip "promptTemplates." prefix from registry nameKeys since t() is already scoped */
+function tKey(nameKey: string): string {
+  return nameKey.replace(/^promptTemplates\./, "");
 }
 
 // ── Toggle Switch ─────────────────────────────────────────
@@ -93,6 +88,7 @@ interface ProjectPromptCardsProps {
 
 export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
   const locale = useLocale();
+  const t = useTranslations("promptTemplates");
 
   const [registry, setRegistry] = useState<RegistryEntry[]>([]);
   const [overrides, setOverrides] = useState<ProjectPromptTemplate[]>([]);
@@ -117,11 +113,11 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
         setEnabled(true);
       }
     } catch {
-      toast.error("加载提示词模板失败");
+      toast.error(t("editor.save") + " failed");
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, t]);
 
   useEffect(() => {
     loadData();
@@ -164,9 +160,9 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
       );
       const overData: ProjectPromptTemplate[] = await overResp.json();
       setOverrides(overData);
-      toast.success("已恢复为全局默认");
+      toast.success(t("editor.resetSuccess"));
     } catch {
-      toast.error("操作失败，请重试");
+      toast.error(t("editor.save") + " failed");
     } finally {
       setDeletingKey(null);
     }
@@ -176,7 +172,7 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
     return (
       <div className="flex h-40 items-center justify-center text-[--text-muted]">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        <span className="text-sm">加载中...</span>
+        <span className="text-sm">Loading...</span>
       </div>
     );
   }
@@ -189,17 +185,15 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
           <ToggleSwitch
             checked={enabled}
             onChange={setEnabled}
-            label="使用项目专属提示词"
+            label={t("project.useProjectPrompts")}
           />
           <p className="ml-12 text-xs text-[--text-muted]">
-            {enabled
-              ? "此项目将使用下方配置的提示词覆盖全局默认设置"
-              : "此项目当前使用全局默认提示词"}
+            {t("project.useProjectPromptsDesc")}
           </p>
         </div>
         {enabled && overrides.length > 0 && (
           <Badge variant="default" className="shrink-0">
-            {overrides.length} 个插槽已覆盖
+            {t("editor.overridden")} ({overrides.length})
           </Badge>
         )}
       </div>
@@ -212,10 +206,10 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
           </div>
           <div>
             <p className="text-sm font-medium text-[--text-secondary]">
-              使用全局提示词
+              {t("editor.usingGlobal")}
             </p>
             <p className="mt-1 text-xs text-[--text-muted]">
-              启用项目专属提示词后，可为此项目单独定制 AI 生成行为
+              {t("project.useProjectPromptsDesc")}
             </p>
           </div>
         </div>
@@ -250,20 +244,20 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-semibold text-[--text-primary]">
-                        {formatNameKey(entry.nameKey)}
+                        {t(tKey(entry.nameKey) as Parameters<typeof t>[0])}
                       </span>
                       {hasOverride ? (
                         <Badge
                           variant="success"
                           className="shrink-0 text-[10px] px-1.5 py-0"
                         >
-                          已覆盖
+                          {t("editor.overridden")}
                         </Badge>
                       ) : (
                         <Badge
                           className="shrink-0 text-[10px] px-1.5 py-0 bg-[--surface] text-[--text-muted]"
                         >
-                          使用全局
+                          {t("editor.usingGlobal")}
                         </Badge>
                       )}
                     </div>
@@ -275,9 +269,9 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
 
                 {/* Slot count */}
                 <p className="text-xs text-[--text-secondary]">
-                  {totalSlots} 个插槽
+                  {t("editor.slotsCount", { count: totalSlots })}
                   {hasOverride && modifiedCount > 0
-                    ? `，${modifiedCount} 个已修改`
+                    ? `, ${t("project.modifiedCount", { count: modifiedCount })}`
                     : ""}
                 </p>
 
@@ -292,7 +286,7 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
                     }}
                   >
                     <Edit className="h-3.5 w-3.5" />
-                    编辑
+                    {t("editor.edit")}
                   </Button>
                   {hasOverride && (
                     <Button
@@ -307,7 +301,7 @@ export function ProjectPromptCards({ projectId }: ProjectPromptCardsProps) {
                       ) : (
                         <RotateCcw className="h-3.5 w-3.5" />
                       )}
-                      用全局
+                      {t("project.useGlobal")}
                     </Button>
                   )}
                 </div>

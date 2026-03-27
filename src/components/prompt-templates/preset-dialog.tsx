@@ -139,7 +139,8 @@ export function PresetDialog({ open, onOpenChange, promptKey }: PresetDialogProp
     if (preset.nameKey) {
       // Try to get the translated name using the nameKey
       try {
-        return t(preset.nameKey.replace(/^promptTemplates\./, "") as Parameters<typeof t>[0]);
+        const key = preset.nameKey.replace(/^promptTemplates\./, "");
+        return t(key as Parameters<typeof t>[0]);
       } catch {
         return preset.name;
       }
@@ -150,7 +151,8 @@ export function PresetDialog({ open, onOpenChange, promptKey }: PresetDialogProp
   const getPresetDescription = (preset: Preset) => {
     if (preset.descriptionKey) {
       try {
-        return t(preset.descriptionKey as Parameters<typeof t>[0]);
+        const key = preset.descriptionKey.replace(/^promptTemplates\./, "");
+        return t(key as Parameters<typeof t>[0]);
       } catch {
         return preset.description ?? "";
       }
